@@ -42,7 +42,7 @@ svg.append("text")
 	.attr("y", margin.top*0.9)
 	.style("opacity", 0.8)
 	.style("font-size", 22)
-	.text("Visualization of Annual Revenue Composition of Singapore Government")
+	.text("Visualization of Annual Revenue of Singapore Government")
 	.call(wrap3)
 
 function help()
