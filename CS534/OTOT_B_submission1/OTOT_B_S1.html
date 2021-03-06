@@ -168,7 +168,17 @@
             var mb_Yaxis = mb_box.append("g")
                                 .attr("id", "main_board_Y")
                                 .attr("transform", "translate(" + (-mb_para.x_axis_margin) + "," + 0 + ")")
-                                .call(d3.axisLeft(mb_y))  
+                                .call(d3.axisLeft(mb_y))
+            
+            mb_svg.append("text")
+                .attr("x", mb_para.margin_left)
+                .attr("y", mb_para.margin_top*0.9)
+                .style("opacity", 0.8)
+                .style("font-size", 22)
+                .text("Visualization of Temperature Anomaly")
+                .style("fill", "#343434")
+            d3.select("#main_board_title")
+                .raise()
             
             // Create Table
             var table = d3.select("#central_control")
@@ -714,14 +724,13 @@
                     generate_line('Jan')
 
                     function exp_mouseover(event, d){
-			//console.log(event)
                         d3.select("#exp_tooltip")
                             .transition()
                             .duration(0)
                             .attr("class", d3.select(this).attr("class") )
                             .text(d.year + " : " + d.value)
-                            .attr("x", event.offsetX-exp_para.margin_left * 0.3)
-                            .attr("y", event.offsetY-exp_para.margin_top*0.6)
+                            .attr("x", event.screenX-exp_para.margin_left * 2.5)
+                            .attr("y", event.offsetY+exp_para.margin_top*3.0)
                             .style("opacity", 1.0)
                         d3.select(this)
                                 .style("stroke", "black")
