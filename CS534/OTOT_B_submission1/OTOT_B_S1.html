@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+    <head>
+        <script src="https://d3js.org/d3.v6.min.js"></script>
+    </head>
+    <style>
+        .zoom {
+            cursor: move;
+            fill: none;
+            pointer-events: all;
+            }
+        #selectButton {
+            width: 150px;
+            height: 40px;
+            background-color: #B2BEB5;
+        }
+        p{
+            color: #000000;
+        }
+        .value_field{
+            background-color: #F88379;
+            text-align: center;
+        }
+        .key_field{
+            background-color: #7393B3;
+            text-align: left;
+        }
+        td{
+            width: 150px;
+        }
+        table{
+            table-layout: fixed;
+            width: 900px; 
+            height: 40px;
+            color: #FFFFFF;
+            margin-left:15px 
+        }
+        #central_control > div{
+            float:left;
+            margin:10px;
+            }
+        .global{
+            fill: #7393B3;
+            stroke: #7393B3;
+        }
+        .southern{
+            fill: #4b5320;
+            stroke: #4b5320;
+        }
+        .northern{
+            fill: #cc0000;
+            stroke: #cc0000;
+        }
+        .grid line {stroke: lightgrey; stroke-opacity: 0.6;}
+    </style>
+    <body>
+        <div id="main_board_viz"></div>
+        <div id="central_control">
+            <div id="button"><select id="selectButton"></select></div>
+        </div>
+        <div id=empty>
+        </div>
+        <div id="time_line_viz"></div>
+        <div id="explotary_plane"></div>
+        <script>
+            d3.select("#empty")
+                .append("svg")
+                .attr("height", 65)
+                .attr("width", 10)
+            // Setting configuration of the chart
+            const start_y = 1880
+            const end_y = 2020
+            const font_size = 18
+            const width = 1600
+            const mini_size_circle = 2
+            const maxi_size_circle = 6
+            const maxi_size_circle_zoom = 3
+            const prefixed_color_lower = -1.6
+            const prefixed_color_upper = 1.9
+            const full_attribute = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
+                                'Oct', 'Nov', 'Dec', 'J-D', 'D-N', 'DJF', 'MAM', 'JJA', 'SON']
+            var attribute = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
+                                'Oct', 'Nov', 'Dec',]
+            const attribute_descrip = {
+                'Jan': 'January',
+                'Feb': 'February',
+                'Mar': 'March',
+                'Apr': 'April',
+                'May': 'May',
+                'Jun': 'June',
+                'Jul': 'July',
+                'Aug': 'August',
+                'Sep': 'September',
+                'Oct': 'October',
+                'Nov': 'Novermber',
+                'Dec': 'December',
+                'J-D': 'Monthly mean average',
+                'D-N': 'Annual mean average',
+                'DJF': 'Winter seasonal average',
+                'MAM': 'Spring seasonal average',
+                'JJA': 'Summer seasonal average',
+                'SON': 'Autumn seasonal average',
+            }
+            attribute = full_attribute
+            var current_selection = "Global"
+            const opacity_map = new Map()
+            for (i = 0; i < full_attribute.length; i++)
+            {
+                opacity_map.set(full_attribute[i], 0)
+            }
+            for (i = 0; i < attribute.length; i++) 
+            {
+                opacity_map.set(attribute[i], 1)
+            }
+            const att_interval = 1 / (attribute.length + 1)
+            const att_ration_arr = [...Array(attribute.length).keys()].map(d => att_interval * d + att_interval)
+            const exe_circle_size = 2.6
+            // Construct the main board
+            const mb_para = {
+                "width" : width,
+                "height" : 460,
+                "margin_left": 50,
+                "margin_right": 40,
+                "margin_top": 30,
+                "margin_buttom": 30,
+                "x_axis_margin": 10
+            }
+            const mb_bounded = {
+                "width" : mb_para.width - mb_para.margin_left - mb_para.margin_right,
+                "height" : mb_para.height - mb_para.margin_top - mb_para.margin_buttom,
+            }
+            const legend_height = 20
+            const legend_width = 150
+            const legend_margin_left = width - 1.4 * legend_width
+            const legend_margin_top = (mb_para.margin_top - legend_height) * 0.9
+
+            var mb_svg = d3.select("#main_board_viz")
+                            .append("div")
+                            .append("svg")
+                            .style("margin-left", 0)
+                            .style("margin-top", 0)
+                            .attr("id", "main_board_canvas")
+                            .attr("width", mb_para.width)
+                            .attr("height", mb_para.height)
+                            //.attr("viewBox", [0, 0, mb_para.width, mb_para.height])
+            var mb_box = mb_svg.append("g")
+                            .attr("id", "main_board_box")
+                            .attr("transform", "translate(" + mb_para.margin_left + "," + mb_para.margin_top + ")")
+            // Create coordinate system for the main board
+            var mb_x = d3.scaleLinear()
+                            .range([0, mb_bounded.width])
+            mb_x.domain([1880, 2021])
+            var mb_y = d3.scaleOrdinal()
+                            .domain(attribute)
+                            .range(att_ration_arr.map(d => (1 - d) * mb_bounded.height))
+            var mb_Xaxis = mb_box.append("g")
+                                .attr("id", "main_board_X")
+                                .attr("transform", "translate(0" + "," + mb_bounded.height + ")")
+                                .call(d3.axisBottom(mb_x)
+                                        .ticks()
+                                        .tickFormat(d3.format("d")))
+            //                            .tickFormat(() => null))
+            mb_Xaxis.selectAll(".tick line")
+                    .attr("stroke", "#fff")
+                    .attr("stroke-opacity", 1.0)
+            
+            var mb_Yaxis = mb_box.append("g")
+                                .attr("id", "main_board_Y")
+                                .attr("transform", "translate(" + (-mb_para.x_axis_margin) + "," + 0 + ")")
+                                .call(d3.axisLeft(mb_y))  
+            
+            // Create Table
+            var table = d3.select("#central_control")
+                            .append("div")
+                            .attr("id", "table")
+                            .append("table")
+            var body = table.append("tbody").append("tr").attr("id", "table_body")
+            
+            // Create head
+            // Create body
+            body.append("td")
+                .attr("class", "key_field")
+                .text("Hemisphere")
+            body.append("td")
+                .attr("class", "value_field")
+                .attr("id", "table_region_value")
+            body.append("td")
+                .attr("class", "key_field")
+                .text("Year")
+            body.append("td")
+                .attr("id", "table_year_value")
+                .attr("class", "value_field")
+            body.append("td")
+                .attr("class", "key_field")
+                .text("Period")
+            body.append("td")
+                .attr("id", "table_month_value")
+                .attr("class", "value_field")
+            body.append("td")
+                .attr("class", "key_field")
+                .text("Temperature Anomaly")
+            body.append("td")
+                .attr("id", "table_relative_difference_value")
+                .attr("class", "value_field")
+            
+            // reset table function
+            reset_table()
+            function reset_table(){
+                        d3.select("#table_region_value")
+                            .text("NULL")
+                        d3.select("#table_year_value")
+                            .text("NULL")
+                        d3.select("#table_month_value")
+                            .text("NULL")
+                        d3.select("#table_relative_difference_value")
+                            .text("NULL")
+                    }
+            // Create explaratory
+            legend_size = 12
+            legend_ft_size = 14
+            tmp_margin_right = 0 //5 * legend_size
+            const exp_para = {
+                "width" : width + tmp_margin_right,
+                "height" : 240,
+                "margin_left": 50,
+                "margin_right": mb_para.margin_right + tmp_margin_right, 
+                "margin_top": 10,
+                "margin_buttom": 30,
+                "circle_size" : 3,
+            }
+
+            const exp_bounded = {
+                "width" : exp_para.width - exp_para.margin_left - exp_para.margin_right,
+                "height" : exp_para.height - exp_para.margin_top - exp_para.margin_buttom,
+            }
+            const exp_xAxis = d3.scaleLinear()
+                        .domain([start_y, end_y])
+                        .range([0, exp_bounded.width])
+            var exp_svg = d3.select("#explotary_plane")
+                .append("div")
+                .append("svg")
+                .attr("id", "explotary_plane_canvas")
+                .attr("height", exp_para.height)
+                .attr("width", exp_para.width)
+                //.attr("viewBox", [0, 0, exp_para.width, exp_para.height])
+            var exp_box = exp_svg.append("g")
+                        .attr("id", "explotary_plane_box")
+                        .attr("transform", "translate(" + exp_para.margin_left + "," + exp_para.margin_top + ")")
+            var exp_x = d3.scaleLinear()
+                        .domain([start_y, end_y])
+                        .range([0, exp_bounded.width])
+            var exp_Xaxis = exp_box.append("g")
+                    .attr("id", "explotary_plane_X")
+                    .attr("transform", "translate(0" + "," + exp_bounded.height + ")")
+                    .call(d3.axisBottom(exp_x)
+                            .ticks()
+                            .tickFormat(d3.format("d")))
+            var exp_y = d3.scaleLinear()
+                        .domain([prefixed_color_lower, prefixed_color_upper])
+                        .range([exp_bounded.height, 0])
+            var exp_Yaxis = exp_box.append("g")
+                    .attr("id", "explotary_plane_Y")
+                    .attr("class", "grid")
+                    .attr("transform", "translate(" + -5 + "," + 0 + ")")
+                    .call(d3.axisLeft(exp_y)
+                            .tickSize(-exp_bounded.width-5)) 
+            exp_legend = exp_svg.append("g")
+                                .attr("id", "exp_legend")
+                                .attr("transform", "translate(" + (exp_para.margin_left * 0.85) + "," + (exp_para.margin_top * 1.8) + ")" )
+            legend_name_list = ["global", "northern", "southern"]
+            exp_legend.selectAll("rect")
+                    .data(legend_name_list)
+                    .enter()
+                    .append("rect")
+                    .attr("class", d => d)
+                    .attr("x", legend_size * 1)
+                    .attr("y", (d,i) => legend_size * i * 1.3)
+                    .attr("width", legend_size)
+                    .attr("height", legend_size)
+            exp_legend.selectAll("text")
+                    .data(legend_name_list)
+                    .enter()
+                    .append("text")
+                    .attr("class", d => d)
+                    .attr("x", legend_size * 2.3)
+                    .attr("y", (d,i) => legend_size * i * 1.3 + legend_size*0.6)
+                    .style("font-size", legend_ft_size * 1.0)
+                    .text(d => d)
+            exp_title = exp_svg.append("g")
+                        .attr("id", "exp_title")
+                        .attr("transform", "translate(" + (exp_para.margin_left + exp_bounded.width*0.4) + "," + (exp_para.margin_top * 3) + ")" )
+            exp_title.append("text")
+                    .attr("id", "exp_title_text")
+                    .style("font-size", legend_ft_size * 1.5)
+            exp_svg.append("g")
+                .append("text")
+                .attr("id", "exp_tooltip")
+                .style("font-size", legend_ft_size * 0.8)
+
+            exp_box.append("g")
+                .attr("id", "explotary_plane_circles_global") 
+            exp_box.append("path")
+	            .attr("id", "explotary_plane_path_global")
+            exp_box.append("g")
+                .attr("id", "explotary_plane_circles_northern")
+            exp_box.append("path")
+	            .attr("id", "explotary_plane_path_northern") 
+            exp_box.append("g")
+                .attr("id", "explotary_plane_circles_southern") 
+            exp_box.append("path")
+                .attr("id", "explotary_plane_path_southern") 
+
+            
+
+            // Construct time line
+            const tl_para = {
+                "width": width,
+                "height": 140,
+                "margin_left": mb_para.margin_left,
+                "margin_right": mb_para.margin_right,
+                "margin_top": 20,
+                "margin_buttom": 30,}
+            const tl_bounded = {
+                "width" : tl_para.width - tl_para.margin_left - tl_para.margin_right,
+                "height" : tl_para.height - tl_para.margin_top - tl_para.margin_buttom,
+            }
+            const tl_svg = d3.select("#time_line_viz")
+                            .append("div")
+                            .append("svg")
+                            .attr("id", "time_line_canvas")
+                            .attr("width", tl_para.width)
+                            .attr("height", tl_para.height)
+                            //.attr("viewBox", [0, 0, tl_para.width, tl_para.height]);
+            const tl_box = tl_svg.append("g")
+                    .attr("id", "time_line_box")
+                    .attr("transform", "translate(" + tl_para.margin_left + "," + tl_para.margin_top + ")")
+            // define x-axis
+            const year_1 = d3.range(start_y, end_y+1, 1)
+            const year_5 = d3.range(start_y, end_y+1, 5)
+            var tl_x = d3.scaleLinear()
+                            .domain([start_y, end_y+1])
+                            .range([0, tl_bounded.width])
+            var tl_Xaxis = tl_box.append("g")
+                .attr("id", "time_line_X")
+                .attr("transform", "translate(0" + "," + tl_bounded.height + ")")
+                .call(d3.axisBottom(tl_x)
+                        .tickValues(year_1)
+                        .tickSize(-tl_bounded.height)
+                        .tickFormat(() => null))
+            tl_Xaxis.select(".domain")
+                    .attr("fill", "#C4A484")
+                    .attr("stroke", null)
+            tl_Xaxis.selectAll(".tick line")
+                    .attr("stroke", "#fff")
+                    .attr("stroke-opacity", 1)
+            var tl_Xaxis_2 = tl_box.append("g")
+                    .attr("id", "time_line_X_2")
+                    .attr("transform", "translate(0" + "," + tl_bounded.height + ")")
+                    .call(d3.axisBottom(tl_x)
+                            .tickValues(year_5)
+                            .tickPadding(0))
+            tl_Xaxis_2.select(".domain")
+                        .remove()
+            // define tooltip
+            var tl_tooltip = tl_svg.append("text")
+                .attr("id", "tl_tooltip_range")
+                .attr("x", tl_para.margin_left*0.2)
+                .attr("y", tl_para.margin_top * 0.8)
+                .style("opacity", 1.0)
+                .style("font-size", font_size)
+                .text("YEAR: NULL")
+
+            var mb_tooltip = mb_box.append("text")
+                .attr("id", "main_board_tooltip")
+                .attr("x", 0)
+                .attr("y", 0)
+                .style("opacity", 0.0)
+                .style("font-size", font_size)
+
+            //time_line_X_height = document.getElementById("time_line_X").getBBox().width
+            // Load Data
+            d3.json("clean_data.json").then(dataViz)
+            var or_circle_scale;
+            var circle_scale;
+            var value_extent;
+            var color_scale;
+            var g_columns;
+            function dataViz(data)
+            {
+                //or_circle_scale = d3.scaleLinear()
+	            //                    .domain(d3.extent(data[current_selection], (d) => Math.abs(parseFloat(d.value))))
+                or_circle_scale = d3.scaleLinear()
+	                                .domain([0, prefixed_color_upper])
+	            circle_scale = or_circle_scale.range([mini_size_circle, maxi_size_circle])
+                //var value_extent = d3.extent(data[current_selection], (d) => parseFloat(d.value))
+                value_extent = [prefixed_color_lower, prefixed_color_upper]
+                color_scale = d3.scaleLinear()
+	                                .domain([value_extent[0], 0, value_extent[1]])
+	                                .range(["#000080", "white", "red"])
+                
+                g_columns = d3.select("#main_board_box")
+                    .selectAll("circle.items")
+                    .data(data[current_selection])
+                    .enter()
+                    .append("circle")
+                    .attr("class", "items")
+                    .attr("cx", d => mb_x(d.year))
+                    .attr("cy", d => mb_y(d.month))
+                    .style("opacity", d => opacity_map.get(d.month))
+                    .attr("r", d => circle_scale(Math.abs(d.value)))
+                    .attr("fill", d => color_scale(d.value))
+                    .on("mouseover", mouseover)
+                    .on("mouseout", mouseout)
+                    .on("click", mouseclick)
+
+                    // Create Zoom-in event
+                    var mb_zoom_event = d3.zoom()
+                                        .scaleExtent([1, Infinity])
+                                        .translateExtent([[0, 0], [mb_bounded.width, mb_bounded.height]])
+                                        .extent([[0, 0], [mb_bounded.width, mb_bounded.height]])
+                                        .on("zoom", mb_zoomed);
+                    // Define Zoom behavior
+                    function mb_zoomed(event) {
+                            if (event.sourceEvent && event.sourceEvent.type === "brush") return; // ignore zoom-by-brush
+                            var t = event.transform;
+                            new_mbx = t.rescaleX(mb_x);
+                            new_exp_x = t.rescaleX(exp_x)
+                            new_extent = Math.min(t.k, maxi_size_circle_zoom)
+                            new_circle_scale = or_circle_scale.range([mini_size_circle * new_extent, maxi_size_circle * new_extent])
+                            new_domain = [Math.ceil(new_mbx.domain()[0]), Math.floor(new_mbx.domain()[1])+1]
+                            update(new_mbx, new_circle_scale, 0, mb_bounded.width, new_domain);
+                            generate_line('Jan', new_exp_x)
+                            
+                    }
+                    // Create Zoom-in Area
+                    var mb_zoom_area = mb_svg.append("rect")
+                            .attr("id", "main_board_zoomed_in_area")
+                            .attr("class", "zoom")
+                            .attr("width", mb_bounded.width)
+                            .attr("height", mb_bounded.height)
+                            .attr("transform", "translate(" + mb_para.margin_left + "," + mb_para.margin_top + ")")
+                            .lower();
+                    mb_zoom_area.call(mb_zoom_event)
+
+                    function update(new_mbx, new_circle_scale, lower_bounded, upper_bounded, range)
+                    {
+                        d3.selectAll("circle.items")
+                            .attr("cx", d => new_mbx(d.year) < lower_bounded ? -mb_para.margin_left*2 : (new_mbx(d.year) > upper_bounded ? mb_para.width:new_mbx(d.year)))
+                            .attr("cy", d => mb_y(d.month))
+                            .style("opacity", d => opacity_map.get(d.month))
+                            .attr("r", d => new_circle_scale(Math.abs(d.value)))
+                            .attr("fill", d => color_scale(d.value))
+
+                        tk_values = new_mbx.ticks()
+                                            .filter(tick => Number.isInteger(tick));
+                        d3.select("#main_board_X")
+                                .call(d3.axisBottom(new_mbx)
+                                    .ticks()
+                                    .tickValues(tk_values)
+                                    .tickFormat(d3.format("d")))
+
+                        range_pos = range.map(d => tl_x(d))
+                        d3.select("#tl_brush")
+                                .transition()
+                                .call(tl_brush.move, range_pos)
+                        var writeText = ("YEAR: ").concat(range[0])
+                        if(range[1] - 1 > range[0])
+                        {
+                            writeText = writeText.concat(" to ").concat(range[1] - 1)
+                        }
+                        tl_tooltip.text(writeText)
+                    }
+
+                    const tl_brush = d3.brushX()
+                            .extent([[0, 0], [tl_bounded.width, tl_bounded.height]])
+                            .on("end", tl_brushed)
+                    // define brush behavior
+                    tl_box.append("g")
+                            .attr("id", "tl_brush")
+                            .call(tl_brush)
+
+                    function tl_brushed(event) {
+                        if(event.selection !== null )
+                        {
+                            if (!event.sourceEvent) return;
+                            const selection = event.selection
+                            if (!selection) return;
+                            var [x0, x1] = selection.map(d => Math.round(tl_x.invert(d)))
+                            x1 = Math.min(x1, 2021)
+                            if(x1 > x0)
+                            {   
+                                // Manipulation for the time line
+                                const [x_pos_0, x_pos_1] = [x0, x1].map(d => tl_x(d))
+                                d3.select(this)
+                                    .transition()
+                                    .call(tl_brush.move, [x_pos_0, x_pos_1])
+                                // Manipulation for the mainboard
+                                d3.select("#main_board_zoomed_in_area")
+                                    .call(mb_zoom_event.transform, d3.zoomIdentity
+                                                            .scale(tl_bounded.width / (selection[1] - selection[0]))
+                                                            .translate(-selection[0], 0))
+
+                                // Manipulation for the tooltip
+                                var writeText = ("YEAR: ").concat(x0)
+                                if(x1 - 1 > x0)
+                                {
+                                    writeText = writeText.concat(" to ").concat(x1 - 1)
+                                }
+                                tl_tooltip.text(writeText)
+                            }
+                        }
+                        else
+                        {
+                            d3.select(this)
+                                .transition()
+                                .call(tl_brush.move, tl_x.range().map(d=>d))
+                            var writeText = ("YEAR: ").concat(start_y).concat(" to ").concat(end_y)
+                            tl_tooltip.text(writeText)
+                        }
+                    }
+
+                    mb_svg.append("defs")
+                        .append("linearGradient")
+                        .attr("id", "linear-gradient")
+                        .selectAll("stop")
+                        .data(color_scale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: color_scale(t), n:n })))                       
+                        .enter()
+                        .append("stop")
+                        .attr("offset", d=>d.offset)
+                        .attr("stop-color", d=>d.color)
+                    mb_svg.append('g')
+                        .attr("id", "legend")
+                        .attr("transform", "translate(" + legend_margin_left + "," + legend_margin_top + ")")
+                        .append("rect")
+                        .attr("transform", "translate(0,0)")
+                        .attr("width", legend_width)
+                        .attr("height", legend_height)
+                        .style("fill", "url(#linear-gradient)")
+                    legend_axis_scale = d3.scaleLinear()
+                                        .domain([color_scale.domain()[0], color_scale.domain()[2]])
+                                        .range([0, legend_width])
+                    legend_axis = d3.select("#legend")
+                        .append("g")
+                        .attr("id", "legend_axis") 
+                        .attr("transform", "translate(0," + legend_height + ")")
+                        .call(d3.axisBottom(legend_axis_scale)
+                            .tickValues(color_scale.domain())
+                            .tickFormat(d3.format(".2f")))
+                            //.tickSize(-legend_height))
+                    legend_axis.select(".domain")
+                        .attr("stroke", null)
+                    legend_axis.selectAll(".tick line")
+                        .attr("stroke", "#fff")
+                        .attr("stroke-opacity", 1)
+
+                    // Add the options to the button
+                    const allGroup = ["Global", "Northern", "Southern"]
+                    d3.select("#selectButton")
+                        .selectAll('myOptions')
+                        .data(allGroup)
+                        .enter()
+                        .append('option')
+                        .text(function (d) { return d; }) // text showed in the menu
+                        .attr("value", function (d) { return d; }) // corresponding value returned by the button
+
+                    // Run option change
+                    d3.select("#selectButton").on("change", function(d) {
+                        // recover the option that has been chosen
+                        const selectedOption = d3.select(this).property("value")
+                        // run the updateChart function with this selected option
+                        update_options(selectedOption)
+                    })
+
+                    function update_options(selectedOption)
+                    {
+                        current_selection = selectedOption
+                        //or_circle_scale = d3.scaleLinear()
+	                    //            .domain(d3.extent(data[current_selection], (d) => Math.abs(parseFloat(d.value))))
+	                    //circle_scale = or_circle_scale.range([mini_size_circle, maxi_size_circle])
+                
+                        g_columns = d3.select("#main_board_box")
+                            .selectAll("circle.items")
+                            .data(data[current_selection])
+                            .attr("cx", d => mb_x(d.year))
+                            .attr("cy", d => mb_y(d.month))
+                            .style("opacity", d => opacity_map.get(d.month))
+                            .attr("r", d => circle_scale(Math.abs(d.value)))
+                            .attr("fill", d => color_scale(d.value))
+                        
+                    }
+
+                    function mouseover(event, d){
+                        d3.select(this)
+                                .style("stroke", "black")
+                                .style("stroke-width", 1) 
+                        d3.select("#table_region_value")
+                            .text(current_selection)
+                        d3.select("#table_year_value")
+                            .text(d.year)
+                        d3.select("#table_month_value")
+                            .text(attribute_descrip[d.month])
+                        d3.select("#table_relative_difference_value")
+                            .text(d.value)
+                                              
+                    }
+
+                    function mouseout(event, d){
+                        d3.select(this)
+                                .style("stroke-width", 0)
+                        reset_table()
+                    }
+
+                    function generate_line(period_type)
+                    {
+                        // Line generator
+                        var lambdaXValue = d => exp_x(d.year)
+                        var lambdaYValue = d => exp_y(d.value)
+                        var tmp_line_gen_per = d3.line()
+                                            .x(lambdaXValue)
+                                            .y(lambdaYValue)
+                                            .curve(d3.curveCardinal)
+                        function compare( a, b ) {
+                                if ( a.year < b.year ){
+                                    return -1;
+                                }
+                                if ( a.year > b.year ){
+                                    return 1;
+                                }
+                                return 0;
+                                }
+                        glb_array = data["Global"].filter(d => d.month === period_type).sort(compare)
+                        north_array = data['Northern'].filter(d => d.month === period_type).sort(compare)
+                        south_array = data['Southern'].filter(d => d.month === period_type).sort(compare)
+
+                        d3.select("#explotary_plane_circles_global")
+                            .selectAll("circle.global")
+                            .data(glb_array)
+                            .enter()
+                            .append("circle")
+                            .attr("class", "global")
+                            .attr("cx", d => exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                            .on("mouseover", exp_mouseover)
+                            .on("mouseout", exp_mouseout)
+                         d3.select("#explotary_plane_circles_global")
+                            .selectAll("circle.global")
+                            .data(glb_array)
+                            .attr("class", "global")
+                            .attr("cx", d =>  exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                        d3.select("#explotary_plane_circles_northern")
+                            .selectAll("circle.northern")
+                            .data(north_array)
+                            .enter()
+                            .append("circle")
+                            .attr("class", "northern")
+                            .attr("cx", d => exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                            .on("mouseover", exp_mouseover)
+                            .on("mouseout", exp_mouseout)
+                        d3.select("#explotary_plane_circles_northern")
+                            .selectAll("circle.northern")
+                            .data(north_array)
+                            .attr("class", "northern")
+                            .attr("cx", d => exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                        d3.select("#explotary_plane_circles_southern")
+                            .selectAll("circle.southern")
+                            .data(south_array)
+                            .enter()
+                            .append("circle")
+                            .attr("class", "southern")
+                            .attr("cx", d => exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                            .on("mouseover", exp_mouseover)
+                            .on("mouseout", exp_mouseout)
+                        d3.select("#explotary_plane_circles_southern")
+                            .selectAll("circle.southern")
+                            .data(south_array)
+                            .attr("class", "southern")
+                            .attr("cx", d => exp_x(d.year))
+                            .attr("cy", d => exp_y(d.value))
+                            .attr("r", exe_circle_size)
+                        
+                        d3.select("#explotary_plane_path_global")
+                            .attr("d", tmp_line_gen_per(glb_array))
+                            .attr("class", "global")
+                            .style("fill", "none")
+			                .attr("stroke-width", 2)
+                        d3.select("#explotary_plane_path_northern")
+                            .attr("d", tmp_line_gen_per(north_array))
+                            .attr("class", "northern")
+                            .style("fill", "none")
+			                .attr("stroke-width", 2)
+                        d3.select("#explotary_plane_path_southern")
+                            .attr("d", tmp_line_gen_per(south_array))
+                            .attr("class", "southern")
+                            .style("fill", "none")
+			                .attr("stroke-width", 2)
+
+                        d3.select("#exp_title_text")
+                            .text(attribute_descrip[period_type])
+                    }
+
+                    function mouseclick(event, d){
+                        generate_line(d.month)
+                    }
+                    generate_line('Jan')
+
+                    function exp_mouseover(event, d){
+                        d3.select("#exp_tooltip")
+                            .transition()
+                            .duration(0)
+                            .attr("class", d3.select(this).attr("class") )
+                            .text(d.year + " : " + d.value)
+                            .attr("x", event.screenX-exp_para.margin_left * 2.5)
+                            .attr("y", event.offsetY+exp_para.margin_top*3.0)
+                            .style("opacity", 1.0)
+                        d3.select(this)
+                                .style("stroke", "black")
+                                .style("stroke-width", 0.8)
+			        }
+                    function exp_mouseout(event, d) {
+                        d3.select("#exp_tooltip")
+                            .transition()
+                            .duration(0)
+                            .style("opacity", 0)
+                        d3.selectAll("circle." + d3.select(this).attr("class"))
+                            .style("stroke", "none")
+                            .style("stroke-width", 0)
+                        }
+			
+            }
+        </script>
+    </body>
+</html>
