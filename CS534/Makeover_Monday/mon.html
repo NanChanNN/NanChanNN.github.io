@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+    <head>
+        <script src="https://d3js.org/d3.v6.min.js"></script>
+    </head>
+    <style>
+        .black_component{
+            background-color: black;
+        }
+        .MyAxis line{
+            stroke: white;
+        }
+
+        .MyAxis path{
+            stroke: white;
+        }
+
+        .MyAxis text{
+            fill: white;
+        }  
+
+        .MyToolTip{
+            font-size: 18pt;
+            fill: white;
+        }
+
+        rect.total{
+            fill: gray;
+        }
+        text.total{
+            fill: gray;
+        }
+
+        rect.Summer{
+            fill: crimson;
+        }
+        circle.Summer{
+            fill: tomato;
+            stroke: tomato;
+        }
+        path.Summer{ 
+            stroke: tomato;
+        }
+        text.Summer{
+            fill: tomato;
+        }
+        text.Summer_2{
+            fill: crimson;
+        }
+        circle.Winter{
+            fill: cornflowerblue;
+            stroke: cornflowerblue;
+        }
+        path.Winter{
+            stroke: cornflowerblue;
+        }
+        rect.Winter{
+            fill: #0047AB;
+        }
+        text.Winter{
+            fill: cornflowerblue;
+        }
+        text.Winter_2{
+            fill: #0047AB;
+        }
+
+        .dashed{
+        stroke-dasharray: 2,1; 
+        stroke:greenyellow;
+        }
+
+        label {
+        color:white;
+    }
+    </style>
+    <body class="black_component">
+        <div id="main_board"></div>
+        <select id="selection_box">
+            <option value="Summer" >Summer Olympics</option>
+            <option value="Winter" >Winter Olympics</option>
+          </select>
+    </body>
+    <script>
+        data_file = "Women-in-the-Olympic-Movement.csv"
+        const para = {
+            "width" : 1540,
+            "height" : 600,
+            "margin_left": 70,
+            "margin_right": 170,
+            "margin_top": 50,
+            "margin_buttom": 50,
+            "begin_year": 1900,
+            "end_year": 2018,
+            "circle_size": 5
+        }
+        const bounded = {
+            "width" : para.width - para.margin_left - para.margin_right,
+            "height" : para.height - para.margin_top - para.margin_buttom,
+        }
+
+        const mb_svg = d3.select("#main_board")
+                        .append("svg")
+                        .attr("id", "main_board_canvas")
+                        .attr("width", para.width)
+                        .attr("height", para.height)
+        
+        const mb_box = mb_svg.append("g")
+                            .attr("id", "main_board_box")
+                            .attr("transform", "translate("+para.margin_left+","+para.margin_top+")")
+
+        const x_year = d3.scaleLinear()
+                        .domain([para.begin_year-1, para.end_year])
+                        .range([0, bounded.width])
+        
+        const bar_width = 1.5 * (x_year(para.begin_year+1) - x_year(para.begin_year))
+
+        const mb_x_axis = mb_box.append("g")
+                            .attr("id", "main_board_Xaxis")
+                            .attr("transform", "translate(0" + "," + bounded.height + ")")
+                            .attr("class", "MyAxis")
+                            //.call(d3.axisBottom(x_year))
+        
+        const y_percentage = d3.scaleLinear()
+                            .range([bounded.height, 0])
+        const y_event = d3.scaleLinear()
+                            .range([bounded.height, 0])
+
+        const mb_y_axis_left = mb_box.append("g")
+                                .attr("id", "main_board_Yaxis_left")
+                                .attr("class", "MyAxis")
+                                .attr("transform", "translate(0,0)")
+
+        const mb_y_axis_right = mb_box.append("g")
+                                .attr("id", "main_board_Yaxis_right")
+                                .attr("class", "MyAxis")
+                                .attr("transform", "translate(" + bounded.width + ",0)")
+        
+        const tooltip = mb_box.append("text")
+                            .attr("id", "main_board_tooltip")
+                            .attr("class", "MyToolTip")
+                            .attr("x", 0)
+                            .attr("y", 0)
+                            .style("opacity", 0.0)
+                            .text("tooltip")
+
+        // Legend Label
+        mb_svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -para.margin_top-bounded.height*0.5)
+            .attr("y", 0)
+            .style("font-size", 16)
+            .style("fill", "white")
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Percentage Of Women Participants"); 
+        mb_svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -para.margin_top-bounded.height*0.5)
+            .attr("y", para.margin_left*1.5 + bounded.width)
+            .style("font-size", 16)
+            .style("fill", "white")
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Number Of Olympic Events"); 
+        mb_svg.append("text")
+            .attr("x", para.margin_left + bounded.width - 20)
+            .attr("y", para.margin_top + bounded.height + 20)
+            .style("font-size", 16)
+            .style("fill", "white")
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Year"); 
+        mb_svg.append("text")
+            .attr("x", para.margin_left + bounded.width * 0.30)
+            .attr("y", 0.8 * para.margin_top)
+            .text("WOMEN IN THE OLYMPIC GAMES")
+            .style("font-size", "28pt")
+            .style("fill", "#C4A484")
+        
+        // Create Legend
+        legend_size = 13
+        mb_legend = mb_svg.append("g")
+            .attr("id", "main_board_legend")
+            .attr("transform", "translate(" + (para.margin_left+bounded.width) + "," + (para.margin_top) + ")")
+        mb_legend.append("rect")
+                .attr("x", 40)
+                .attr("width", legend_size)
+                .attr("y", 0)
+                .attr("height", legend_size)
+                .attr("class", "total")
+        mb_legend.append("text")
+                .attr("x", 40 + legend_size + 10)
+                .attr("y", 10)
+                .style("font-size", 14)
+                .attr("class", "total")
+                .text("Total Events."); 
+        mb_legend.append("rect")
+                .attr("id", "legend_event")
+                .attr("x", 40)
+                .attr("y", legend_size + 10)
+                .attr("height", legend_size)
+                .attr("width", legend_size)
+        mb_legend.append("text")
+                .attr("id", "legend_event_text")
+                .attr("x", 40 + legend_size + 10)
+                .attr("y", 10 + legend_size + 10)
+                .style("font-size", 14)
+                .text("Women’s Events."); 
+        mb_legend.append("circle")
+                .attr("id", "legend_percentage")
+                .attr("cx", 40 + legend_size*0.5)
+                .attr("cy", 2*legend_size + 10*2 + legend_size*0.5)
+                .attr("r", legend_size*0.5)
+        mb_legend.append("text")
+                .attr("id", "legend_percentage_text")
+                .attr("x", 40 + legend_size + 10)
+                .attr("y", 10 + legend_size * 2 + 10 * 2)
+                .style("font-size", 14)
+                .text("Percentage."); 
+        
+        var setting_list = ["Summer", "Winter"];
+        const default_setting = "Summer"
+
+        d3.csv(data_file).then(dataViz)
+        function dataViz(data){
+            // filter data
+            summer_data = data.filter(d => d.Olympics === "Summer")
+            winter_data = data.filter(d => d.Olympics === "Winter")
+            summer_ticks = summer_data.map(d => parseInt(d.Year))
+            winter_ticks = winter_data.map(d => parseInt(d.Year))
+
+            data_map ={
+                "Summer": summer_data,
+                "Winter": winter_data,
+                "Summer_ticks": summer_ticks,
+                "Winter_ticks": winter_ticks,
+            }
+
+            // initialize the y extent
+            summer_y_percentage_extent = d3.extent(summer_data, (d) => parseFloat(d["% Of Women Participants"]))
+            summer_y_percentage_extent = [0, summer_y_percentage_extent[1]]
+            winter_y_percentage_extent = d3.extent(winter_data, (d) => parseFloat(d["% Of Women Participants"]))
+            winter_y_percentage_extent = [0, winter_y_percentage_extent[1]]
+            summer_y_event_extent = d3.extent(summer_data, (d) => parseFloat(d["Total Events"]))
+            summer_y_event_extent = [0, summer_y_event_extent[1]]
+            winter_y_event_extent = d3.extent(winter_data, (d) => parseFloat(d["Total Events"]))
+            winter_y_event_extent = [0, winter_y_event_extent[1]]
+            y_extent_map = {
+                "Summer_per": summer_y_percentage_extent,
+                "Winter_per": winter_y_percentage_extent,
+                "Summer_y_event": summer_y_event_extent,
+                "Winter_y_event": winter_y_event_extent,
+            }
+
+            // initialize the circle
+            const summer_board = mb_box.append("g")
+                .attr("id", "Summer_board")
+
+            const winter_board = mb_box.append("g")
+                .attr("id", "Winter_board")
+            
+            summer_rect = summer_board.selectAll("g")
+                .data(summer_data)
+                .enter()
+                .append("g")
+            summer_rect.append("rect")
+                .attr("class", "total")
+                .attr("x", 0)
+                .attr("width", 0)
+                .attr("y", 0)
+                .attr("height", 0)
+            summer_rect.append("rect")
+                .attr("class", "Summer")
+                .attr("x", 0)
+                .attr("width", 0)
+                .attr("y", 0)
+                .attr("height", 0)
+            summer_rect.append("line")
+                .attr("class", "dashed")
+                .attr('x1', 0)
+                .attr('y1', 0)
+                .attr('x2', 0)
+                .attr('y2', 0)
+
+            winter_rect = winter_board.selectAll("g")
+                .data(winter_data)
+                .enter()
+                .append("g")
+            winter_rect.append("rect")
+                .attr("class", "total")
+                .attr("x", 0)
+                .attr("width", 0)
+                .attr("y", 0)
+                .attr("height", 0)
+            winter_rect.append("rect")
+                .attr("class", "Winter")
+                .attr("x", 0)
+                .attr("width", 0)
+                .attr("y", 0)
+                .attr("height", 0)
+            winter_rect.append("line")
+                .attr("class", "dashed")
+                .attr('x1', 0)
+                .attr('y1', 0)
+                .attr('x2', 0)
+                .attr('y2', 0)
+
+            summer_board.selectAll("circle.Summer")
+                .data(summer_data)
+                .enter()
+                .append("circle")
+                .attr("class", "Summer")
+                .attr("cx", 0.0)
+                .attr("cy", 0.0)
+                .style("opacity", 0.0)
+                .attr("r", 0.0)
+                .on("mouseover", mouseover)
+                .on("mouseout", mouseout)
+                
+            winter_board.selectAll("circle.Winter")
+                .data(winter_data)
+                .enter()
+                .append("circle")
+                .attr("class", "Winter")
+                .attr("cx", 0.0)
+                .attr("cy", 0.0)
+                .style("opacity", 0.0)
+                .attr("r", 0.0)
+                .on("mouseover", mouseover)
+                .on("mouseout", mouseout)
+
+            const data_path = mb_box.append("path")
+                            .attr("id", "data_path")
+            
+            update(default_setting)
+
+            function mouseover(event, d){
+                word = parseFloat(d["% Of Women Participants"])
+                tooltip.transition()
+					.duration(0)
+					.style("opacity", 1.0);
+                tooltip.text(word.toFixed(3))
+					.attr("x", 10)
+				    .attr("y", -10)
+			    d3.select(this)
+					.style("stroke", "white")
+					.style("stroke-width", 2)   
+            }
+
+            function mouseout(event) {
+	            tooltip.transition()
+						.duration(30)
+						.style("opacity", 0);
+				d3.selectAll("circle")
+	        	.style("stroke", "none")
+	        	.style("stroke-width", 0)
+	        }
+
+            d3.select("#selection_box")
+                .on("change", on_changed)
+            function on_changed()
+            {
+                selected_value = d3.select(this).property('value')
+                update(selected_value)
+            }
+
+            function update(setting)
+            {
+                the_ohter = setting_list.filter(d => d !== setting)
+                tmp_y_left = y_percentage.domain(y_extent_map[setting+"_per"])
+                tmp_y_right = y_event.domain(y_extent_map[setting+"_y_event"])
+                ticks_value = data_map[setting+"_ticks"]
+
+                var tmp_line_gen = d3.line()
+                    .x(d => x_year(d.Year))
+                    .y(d => tmp_y_left(d["% Of Women Participants"]))
+                    .curve(d3.curveCardinal)
+
+                mb_y_axis_left.call(d3.axisLeft(tmp_y_left))
+                mb_y_axis_right.call(d3.axisRight(tmp_y_right))
+                mb_x_axis.call(d3.axisBottom(x_year)
+                                .tickValues(ticks_value)
+                                .tickFormat(d3.format("d")))
+
+                d3.select("#"+the_ohter+"_board")
+                    .selectAll("rect")
+                    .attr("x", 0)
+                    .attr("width", 0)
+                    .attr("y", 0)
+                    .attr("height", 0)
+                d3.select("#"+the_ohter+"_board")
+                    .selectAll("line")
+                    .attr('x1', 0)
+                    .attr('y1', 0)
+                    .attr('x2', 0)
+                    .attr('y2', 0)
+
+                d3.select("#"+setting+"_board")
+                    .selectAll("rect.total")
+                    .attr("x", d => x_year(d.Year) - 0.5*bar_width)
+                    .attr("width", bar_width)
+                    .attr("y", d => tmp_y_right(parseFloat(d["Total Events"])))
+                    .attr("height", d => bounded.height - tmp_y_right(parseFloat(d["Total Events"])))
+                d3.select("#"+setting+"_board")
+                    .selectAll("rect."+setting)
+                    .attr("x", d => x_year(d.Year) - 0.5*bar_width)
+                    .attr("width", bar_width)
+                    .attr("y", d => tmp_y_right(parseFloat(d["Women’s Events"])))
+                    .attr("height", d => bounded.height - tmp_y_right(parseFloat(d["Women’s Events"])))
+                d3.select("#"+setting+"_board")
+                    .selectAll("line.dashed")
+                    .attr('x1', d => x_year(d.Year) - 0.5*bar_width)
+                    .attr('y1', d => tmp_y_right(parseFloat(d["Total Events"]) * 0.5)) 
+                    .attr('x2', d => x_year(d.Year) + 0.5*bar_width)
+                    .attr('y2', d => tmp_y_right(parseFloat(d["Total Events"]) * 0.5))
+
+                d3.select("#"+the_ohter+"_board")
+                    .selectAll("circle")
+                    .attr("cx", 0.0)
+                    .attr("cy", 0.0)
+                    .style("opacity", 0.0)
+                    .attr("r", 0.0)
+
+                d3.select("#"+setting+"_board")
+                    .selectAll("circle")
+                    .attr("cx", d => x_year(d.Year))
+                    .attr("cy", d => tmp_y_left(parseFloat(d["% Of Women Participants"])))
+                    .style("opacity", 1.0)
+                    .attr("r", para.circle_size)
+
+                d3.select("#data_path")
+                    .attr("d", tmp_line_gen(data_map[setting]))
+                    .attr("class", setting)
+                    .attr("fill", "none")
+                    .attr("stroke-width", 2)  
+                    
+                d3.select("#legend_event")
+                    .attr("class", setting)
+                d3.select("#legend_event_text")
+                    .attr("class", setting)
+                d3.select("#legend_percentage")
+                    .attr("class", setting+"")
+                d3.select("#legend_percentage_text")
+                    .attr("class", setting + "_2")
+    
+            }
+        }
+
+    </script>
+</html>
